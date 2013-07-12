@@ -22,6 +22,7 @@ References:
 */
 
 var fs = require('fs');
+var rest = require('restler');
 var program = require('commander');
 var cheerio = require('cheerio');
 var HTMLFILE_DEFAULT = "index.html";
@@ -44,8 +45,7 @@ var loadChecks = function(checksfile) {
     return JSON.parse(fs.readFileSync(checksfile));
 };
 
-var checkHtmlFile = function(htmlfile, checksfile) {
-    $ = cheerioHtmlFile(htmlfile);
+var checkHtmlFile = function(checksfile) {
     var checks = loadChecks(checksfile).sort();
     var out = {};
     for(var ii in checks) {
@@ -61,14 +61,27 @@ var clone = function(fn) {
     return fn.bind({});
 };
 
+var printResults = function(checks) {
+    var checkJson = checkHtmlFile(checks);
+    var outJson= JSON.stringify(checkJson, null, 4);
+    console.log(outJson);
+};
+
 if(require.main == module) {
     program
         .option('-c, --checks <check_file>', 'Path to checks.json', clone(assertFileExists), CHECKSFILE_DEFAULT)
         .option('-f, --file <html_file>', 'Path to index.html', clone(assertFileExists), HTMLFILE_DEFAULT)
-        .parse(process.argv);
-    var checkJson = checkHtmlFile(program.file, program.checks);
-    var outJson = JSON.stringify(checkJson, null, 4);
-    console.log(outJson);
+        .option('-u, --url [value]', 'url to index.html')
+	.parse(process.argv);
+    if (program.url) {
+	rest.get(program.url).on('complete', function(data) {
+	    $ = cheerio.load(data);
+	    printResults(program.checks);
+	});
+    } else {
+	$ = cheerioHtmlFile(program.file);
+	printResults(program.checks);
+    }
 } else {
     exports.checkHtmlFile = checkHtmlFile;
 }
